@@ -3,10 +3,16 @@ import pandas as pd
 import google.generativeai as genai
 import io
 
-# --- CONFIGURACIÓN DE LA PÁGINA ---
+# --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Rappi OKR Generator", page_icon="🧡")
 
-# --- FUNCIONES DE EXPORTACIÓN ---
+# Intentamos sacar la API Key de los Secretos de la plataforma
+try:
+    gemini_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=gemini_key)
+except:
+    st.error("⚠️ Configuración faltante: La API Key no está en los Secretos.")
+
 def export_to_excel(okr_list):
     df = pd.DataFrame(okr_list)
     output = io.BytesIO()
@@ -15,26 +21,25 @@ def export_to_excel(okr_list):
     return output.getvalue()
 
 # --- INTERFAZ ---
-st.title("🧡 Rappi OKR Generator")
-
-# Entrada para la API Key (Para que no la dejes fija en el código por seguridad)
-api_key_input = st.text_input("Pega aquí tu Gemini API Key:", type="password")
+st.title("Generador Automático de OKRs")
+st.info("Sube tu documento y el sistema extraerá los OKRs alineados a tu rol.")
 
 is_leader = st.radio("¿Eres líder?", ("Sí", "No"))
 uploaded_file = st.file_uploader("Sube tu 6Pager (PDF)", type=["pdf"])
 
-if st.button("Generar OKRs"):
-    if not api_key_input:
-        st.error("Debes pegar la API Key que sacaste de Google AI Studio.")
+if st.button("Generar OKRs SMART"):
+    if uploaded_file:
+        with st.spinner('Gemini está analizando tu documento...'):
+            # Aquí simulamos la respuesta de la IA por ahora
+            mis_okrs = [
+                {"Objetivo": "Optimización Operativa", "KR": "Reducir tiempos de entrega", "Métrica": "Minutos", "Meta": "-10%", "Deadline": "Q4 2024"}
+            ]
+            st.table(mis_okrs)
+            
+            excel_file = export_to_excel(mis_okrs)
+            st.download_button("📥 Descargar Excel", excel_file, "okrs_rappi.xlsx")
     else:
-        # Aquí conectamos con Gemini usando la llave que pegaste en la web
-        genai.configure(api_key=api_key_input)
-        
-        # Simulación de respuesta (Esto se verá en tu pantalla)
-        mis_okrs = [
-            {"Objetivo": "Liderazgo en Mercado", "KR": "Crecer 20% en pedidos", "Métrica": "Órdenes", "Meta": "+20%", "Deadline": "Dic 2024"}
-        ]
-        
+        st.warning("Por favor sube un archivo PDF primero.")
         st.table(mis_okrs)
         
         excel_file = export_to_excel(mis_okrs)
