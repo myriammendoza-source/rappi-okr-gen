@@ -5,29 +5,25 @@ import io
 import re
 
 # --- CONFIGURACIÓN E IDENTIDAD VISUAL ---
-st.set_page_config(page_title="Rappi OKR Builder | Internal Tool", layout="wide")
+st.set_page_config(page_title="Rappi OKR Builder", layout="wide")
 
-# CSS inyectado para un look más "Enterprise"
+# CSS para look corporativo (Naranja Rappi #FF441F)
 st.markdown("""
     <style>
-    .main { background-color: #f5f5f5; }
+    .stApp { background-color: #FFFFFF; }
     .stButton>button {
         background-color: #FF441F;
         color: white;
-        border-radius: 4px;
+        border-radius: 8px;
+        width: 100%;
+        font-weight: bold;
         border: none;
-        padding: 0.5rem 2rem;
     }
-    .stTextInput>div>div>input { border-radius: 4px; }
+    .stTextInput>div>div>input { border-radius: 8px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- LÓGICA DE NEGOCIO ---
-try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-except:
-    st.error("Error de autenticación: API Key no detectada.")
-
+# --- LÓGICA INTERNA ---
 def export_to_excel(okr_list):
     df = pd.DataFrame(okr_list)
     output = io.BytesIO()
@@ -35,58 +31,49 @@ def export_to_excel(okr_list):
         df.to_excel(writer, index=False, sheet_name='OKR_Export')
     return output.getvalue()
 
-def extract_drive_id(url):
-    """Extrae el ID del documento de una URL de Google Drive."""
-    match = re.search(r"/d/([a-zA-Z0-9-_]+)", url)
-    return match.group(1) if match else None
-
 # --- INTERFAZ ---
 st.title("Rappi OKR Builder")
-st.caption("Internal Strategy Tool | Powered by Gemini Pro")
+st.write("Herramienta interna para la alineación de objetivos estratégicos.")
 
-col1, col2 = st.columns([1, 1])
+col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.subheader("Configuración de Contexto")
-    drive_url = st.text_input("Enlace de Google Drive (6Pager / Estrategia)", 
-                               placeholder="https://docs.google.com/document/d/...")
+    drive_url = st.text_input("Enlace de Google Drive (6Pager)", 
+                               placeholder="Pega el link de tu documento aquí...")
     
-    role = st.selectbox("Nivel de Estructura", ["Individual Contributor", "Manager", "Head / Director", "VP"])
-
 with col2:
-    st.subheader("Parámetros de Salida")
-    quarter = st.select_slider("Trimestre", options=["Q1", "Q2", "Q3", "Q4"])
-    language = st.radio("Idioma de redacción", ["Español", "Inglés"], horizontal=True)
+    role = st.selectbox("Tu Rol", ["Individual Contributor", "Manager", "Head / Director", "VP"])
 
 st.divider()
 
-if st.button("Generar OKRs Corporativos"):
+# Solo cuando el usuario hace clic, validamos la API Key
+if st.button("Generar OKRs SMART"):
     if not drive_url:
-        st.warning("Se requiere un enlace de Google Drive para proceder.")
+        st.warning("Por favor, introduce un enlace de Google Drive.")
     else:
-        drive_id = extract_drive_id(drive_url)
-        if not drive_id:
-            st.error("URL de Google Drive no válida. Asegúrate de que el enlace sea correcto.")
+        # Validación silenciosa de la llave
+        if "GEMINI_API_KEY" not in st.secrets:
+            st.error("Error de configuración interna. Contacta al administrador (Falta API Key en Secrets).")
         else:
-            with st.spinner('Analizando documentación estratégica...'):
-                # PROMPT SYSTEM: Aquí es donde Gemini actúa como PM de Rappi
-                # (Simulación de resultado para el prototipo)
-                results = [
-                    {"Objetivo": "Optimizar el Burn Rate de Growth", "KR": "Reducir CAC en canales pagados", "Métrica": "USD", "Meta": "-15%", "Deadline": "End of Q4"},
-                    {"Objetivo": "Excelencia Operativa en Dark Stores", "KR": "Mejorar el picking time promedio", "Métrica": "Segundos", "Meta": "120s", "Deadline": "End of Q4"}
-                ]
-                
-                st.subheader("Propuesta de OKRs SMART")
-                st.table(results)
-                
-                # Exportación
-                excel_file = export_to_excel(results)
-                st.download_button(
-                    label="Exportar a Excel (.xlsx)",
-                    data=excel_file,
-                    file_name=f"OKRs_Rappi_{quarter}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+            with st.spinner('Procesando estrategia...'):
+                try:
+                    # Configuración bajo demanda
+                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    
+                    # Simulación de IA (Aquí conectaremos la lectura del Drive)
+                    results = [
+                        {"Objetivo": "Maximizar eficiencia en Turbo", "KR": "Reducir picking time a <90s", "Métrica": "Segundos", "Meta": "90", "Deadline": "Q4 2024"},
+                        {"Objetivo": "Crecimiento Prime", "KR": "Incrementar conversión en checkout", "Métrica": "%", "Meta": "+5%", "Deadline": "Q4 2024"}
+                    ]
+                    
+                    st.subheader("Propuesta de OKRs")
+                    st.table(results)
+                    
+                    excel_file = export_to_excel(results)
+                    st.download_button("📥 Descargar Reporte Excel", excel_file, "okrs_rappi.xlsx")
+                except Exception as e:
+                    st.error(f"Hubo un problema al procesar el archivo. Revisa los permisos del link.")
 
+st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/0/06/Rappi_logo.svg", width=100)
 st.sidebar.markdown("---")
-st.sidebar.info("Esta herramienta procesa datos bajo la política de privacidad de Rappi. No compartas información sensible fuera del dominio @rappi.com.")
+st.sidebar.caption("Versión 1.2.0 | Internal Strategy")
