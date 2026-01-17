@@ -4,15 +4,25 @@ import google.generativeai as genai
 import io
 import json
 
-# --- CONFIGURACIÓN ---
-st.set_page_config(page_title="Rappi OKR Builder | Secure", layout="wide")
+# --- CONFIGURACIÓN E IDENTIDAD VISUAL ---
+st.set_page_config(page_title="Rappi OKR Builder", layout="wide")
 
-# Estilo Corporativo Minimalista
+# CSS para restaurar el Look & Feel corporativo
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; }
-    .stButton>button { background-color: #FF441F; color: white; border-radius: 8px; font-weight: bold; }
-    .stTextArea>div>div>textarea { background-color: #f8f9fa; }
+    .stButton>button {
+        background-color: #FF441F;
+        color: white;
+        border-radius: 8px;
+        width: 100%;
+        font-weight: bold;
+        border: none;
+        height: 3em;
+    }
+    .main-title { color: #FF441F; font-size: 40px; font-weight: bold; }
+    .stTextArea>div>div>textarea { border-radius: 10px; }
+    .privacy-tag { color: #888888; font-size: 12px; text-align: center; margin-top: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -20,67 +30,73 @@ def export_to_excel(okr_list):
     df = pd.DataFrame(okr_list)
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Mis_OKRs')
+        df.to_excel(writer, index=False, sheet_name='OKR_Export')
     return output.getvalue()
 
 # --- INTERFAZ ---
-st.title("Rappi OKR Builder")
-st.warning("🔒 PRIVACIDAD: El contenido pegado se procesa en memoria y no se almacena en ninguna base de datos.")
+st.markdown('<p class="main-title">Rappi OKR Builder</p>', unsafe_allow_html=True)
+st.write("Herramienta estratégica para la definición de objetivos de alto impacto.")
 
 col1, col2 = st.columns([2, 1])
+
 with col1:
-    # Cambiamos Link por Texto Directo para evitar exponer archivos
-    context_text = st.text_area("Pega aquí el contenido de tu 6Pager o Estrategia:", height=300, 
-                                placeholder="Copia el texto del documento de Drive y pégalo aquí...")
+    context_text = st.text_area("Contenido del 6Pager / Estrategia", 
+                               placeholder="Pega aquí el texto de tu documento confidencial...",
+                               height=350)
+    st.markdown('<p class="privacy-tag">🔒 Los datos se procesan en memoria y no se almacenan.</p>', unsafe_allow_html=True)
+
 with col2:
-    role = st.selectbox("Tu Rol", ["Individual Contributor", "Manager", "Head / Director", "VP"])
-    is_leader = role in ["Manager", "Head / Director", "VP"]
+    st.subheader("Parámetros")
+    role = st.selectbox("Nivel del Rol", ["Individual Contributor", "Manager", "Head / Director", "VP"])
+    quarter = st.selectbox("Quarter", ["Q1", "Q2", "Q3", "Q4"])
+    
+    st.markdown("---")
+    generate_btn = st.button("GENERAR OKRs ESTRATÉGICOS")
 
 st.divider()
 
-if st.button("Generar OKRs Seguros"):
+if generate_btn:
     if not context_text:
-        st.warning("Por favor, pega el contenido de tu documento.")
+        st.warning("El campo de contenido no puede estar vacío.")
     elif "GEMINI_API_KEY" not in st.secrets:
-        st.error("Error: API Key no configurada en los Secrets.")
+        st.error("Error: Configura la GEMINI_API_KEY en los Secrets de Streamlit.")
     else:
-        with st.spinner('Analizando información bajo protocolo de seguridad...'):
+        with st.spinner('Analizando con Gemini Pro...'):
             try:
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
                 model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                # Prompt estructurado para recibir una respuesta en formato JSON limpio
+                is_leader = role in ["Manager", "Head / Director", "VP"]
+                
                 prompt = f"""
-                Actúa como un Senior PM en Rappi. Basado en este texto:
-                ---
-                {context_text}
-                ---
-                Genera entre 3 y 5 OKRs SMART. 
-                REGLAS:
-                1. Uno de AI.
+                Actúa como un Senior PM de Rappi. Basado en este texto: {context_text[:4000]}
+                Genera entre 3 y 5 OKRs SMART.
+                Reglas Obligatorias:
+                1. Uno de AI/Eficiencia.
                 2. Uno de prioridades Rappi (Growth/Profit/UX).
                 3. {'Uno de eNPS de equipo' if is_leader else 'Uno de desarrollo profesional personal'}.
                 
-                Devuelve la respuesta EXCLUSIVAMENTE como un JSON válido que sea una lista de objetos con estas llaves: 
-                "Objetivo", "KR", "Métrica", "Meta", "Deadline". 
-                No agregues texto extra antes o después del JSON.
+                Devuelve la respuesta EXCLUSIVAMENTE en formato JSON plano (lista de objetos) con llaves: 
+                "Objetivo", "KR", "Métrica", "Meta", "Deadline". Sin texto adicional.
                 """
                 
                 response = model.generate_content(prompt)
-                
-                # Limpiar la respuesta de posibles marcas de código (```json ...)
                 clean_json = response.text.replace('```json', '').replace('```', '').strip()
                 okr_data = json.loads(clean_json)
                 
-                # Mostrar resultados
-                st.subheader("Resultados Generados")
+                st.subheader(f"Propuesta de OKRs - {quarter}")
                 st.table(okr_data)
                 
-                # Excel
                 excel_file = export_to_excel(okr_data)
-                st.download_button("📥 Descargar OKRs en Excel", excel_file, "okrs_rappi.xlsx")
-                
+                st.download_button(
+                    label="📥 DESCARGAR EXCEL",
+                    data=excel_file,
+                    file_name=f"OKRs_Rappi_{role}_{quarter}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
             except Exception as e:
-                st.error("Error al procesar. Asegúrate de que el texto sea suficiente para extraer objetivos.")
+                st.error("Hubo un error al procesar el texto. Intenta pegar una sección más corta o clara.")
 
-st.sidebar.image("[https://upload.wikimedia.org/wikipedia/commons/0/06/Rappi_logo.svg](https://upload.wikimedia.org/wikipedia/commons/0/06/Rappi_logo.svg)", width=100)
+# Sidebar limpia
+st.sidebar.title("Rappi Tech")
+st.sidebar.info("Esta herramienta usa la API de Gemini para procesamiento seguro de lenguaje natural.")
