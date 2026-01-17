@@ -15,15 +15,22 @@ st.markdown("""
         color: white; 
         border-radius: 8px; 
         font-weight: bold; 
-        height: 3em; 
+        height: 3.5em; 
         width: 100%;
         border: none;
+        font-size: 16px;
     }
-    .main-title { color: #FF441F; font-size: 35px; font-weight: bold; margin-bottom: 0px; }
-    .subtitle { color: #666666; font-size: 16px; margin-bottom: 30px; }
+    /* Título con letra más grande (50px) */
+    .main-title { 
+        color: #FF441F; 
+        font-size: 50px; 
+        font-weight: 900; 
+        margin-bottom: -10px;
+        line-height: 1.2;
+    }
+    .subtitle { color: #666666; font-size: 18px; margin-bottom: 35px; }
     .privacy-tag { color: #999999; font-size: 11px; margin-top: 10px; }
-    /* Estilo para el logo en el sidebar */
-    .sidebar-logo { margin-top: 20px; }
+    .sidebar-logo { margin-top: 25px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -36,78 +43,83 @@ def export_to_excel(okr_list):
 
 # --- HEADER PRINCIPAL ---
 st.markdown('<p class="main-title">Rappi OKR Generator</p>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">Herramienta estratégica para la creación de OKRs basados en roles y documentación corporativa.</p>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Transforma borradores en objetivos SMART alineados con la estrategia de Rappi.</p>', unsafe_allow_html=True)
 
 # --- CUERPO DE LA APP ---
-col1, col2 = st.columns([1.5, 1])
+col1, col2 = st.columns([1.6, 1])
 
 with col1:
     st.subheader("1. Contexto Estratégico")
     context_text = st.text_area(
-        "Ingresa información del 6Pager, OKRs de Jefe o Estrategia:", 
+        "Documentación de soporte (6Pager, OKRs de Jefe, etc.):", 
         height=250, 
-        placeholder="Pega aquí el contenido relevante..."
+        placeholder="Pega aquí el contenido que servirá de guía para la IA..."
     )
     
     st.subheader("2. Tu Borrador de OKR")
     user_draft = st.text_area(
-        "Escribe tu idea inicial:", 
-        placeholder="Ej: Aumentar la eficiencia del equipo de soporte.",
+        "Idea inicial de tu objetivo:", 
+        placeholder="Ej: Optimizar la conversión del funnel de Rappi Pay.",
         height=100
     )
-    st.markdown('<p class="privacy-tag">🔒 Procesamiento seguro en memoria. Datos no almacenados.</p>', unsafe_allow_html=True)
+    st.markdown('<p class="privacy-tag">🔒 Procesamiento seguro. Los datos no se guardan en servidores externos.</p>', unsafe_allow_html=True)
 
 with col2:
     st.subheader("Configuración")
     role = st.selectbox("Nivel del Rol", ["Assistant", "Analyst", "Specialist", "Lead", "Manager", "Head", "Director", "VP"])
     
-    st.markdown("---")
-    generate_btn = st.button("OPTIMIZAR HACIA SMART")
+    st.info("""
+    **Guía rápida:**
+    1. Define tu **Nivel de Rol**.
+    2. Provee el **Contexto** (estrategia).
+    3. Escribe tu **Borrador**.
+    4. El sistema generará 3 opciones SMART.
+    """)
+    
+    generate_btn = st.button("GENERAR OKRs OPTIMIZADOS")
 
 st.divider()
 
 # --- LÓGICA DE IA ---
 if generate_btn:
     if not user_draft:
-        st.warning("Debes ingresar un borrador para que la IA pueda trabajar.")
+        st.warning("⚠️ Ingresa un borrador para continuar.")
     elif "GEMINI_API_KEY" not in st.secrets:
-        st.error("API Key no configurada.")
+        st.error("Error: API Key no detectada en Secrets.")
     else:
-        with st.spinner('Refinando OKR con estándares SMART de Rappi...'):
+        with st.spinner('Gemini está puliendo tus objetivos...'):
             try:
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
                 model = genai.GenerativeModel('gemini-1.5-flash')
                 
                 prompt = f"""
-                Actúa como un Senior Strategy Manager de Rappi. 
-                Convierte este borrador: "{user_draft}" en versiones SMART.
-                Usa este contexto: {context_text}
-                Nivel del rol: {role}
+                Actúa como experto en estrategia corporativa en Rappi. 
+                Refina este borrador: "{user_draft}" basándote en: {context_text}
+                Para un perfil nivel: {role}.
                 
-                Reglas:
-                1. Genera 3 sugerencias SMART.
-                2. Asegura alineación con eficiencia, IA o prioridades Rappi.
-                3. Responde solo JSON con: Objetivo, KR, Métrica, Meta, Deadline, Explicacion_SMART.
+                Salida requerida:
+                - 3 opciones SMART.
+                - Incluir enfoque en IA y prioridades de negocio (Growth/EBITDA).
+                - Formato JSON lista de objetos: Objetivo, KR, Métrica, Meta, Deadline, Explicacion_SMART.
                 """
                 
                 response = model.generate_content(prompt)
                 clean_json = response.text.replace('```json', '').replace('```', '').strip()
                 okr_data = json.loads(clean_json)
                 
-                st.subheader("🚀 Propuestas SMART Generadas")
+                st.subheader("🚀 Propuestas de OKRs Refinados")
                 st.table(okr_data)
                 
                 excel_file = export_to_excel(okr_data)
-                st.download_button("📥 DESCARGAR EN EXCEL", excel_file, "Rappi_OKRs_Optimized.xlsx")
+                st.download_button("📥 DESCARGAR RESULTADOS (EXCEL)", excel_file, "Rappi_OKR_Optimized.xlsx")
                 
             except Exception as e:
-                st.error("No se pudo procesar la solicitud. Intenta con un borrador más descriptivo.")
+                st.error("Hubo un problema al generar la respuesta. Intenta simplificar el texto de entrada.")
 
-# --- SIDEBAR (LOGO Y VERSIÓN) ---
+# --- SIDEBAR (VERSIÓN Y LOGO AL FINAL) ---
 st.sidebar.markdown("---")
 st.sidebar.caption("v2.1 | Secure Internal Tool")
-# El logo debajo de la versión como solicitaste
 st.sidebar.markdown(
-    '<div class="sidebar-logo"><img src="https://upload.wikimedia.org/wikipedia/commons/0/06/Rappi_logo.svg" width="100"></div>', 
+    '<div class="sidebar-logo"><img src="https://upload.wikimedia.org/wikipedia/commons/0/06/Rappi_logo.svg" width="120"></div>', 
     unsafe_allow_html=True
 )
